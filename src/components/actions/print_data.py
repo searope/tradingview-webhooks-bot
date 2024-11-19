@@ -14,4 +14,4 @@ class PrintData(Action):
         print(self.name, '---> action has run!')
         data = self.validate_data()  # always get data from webhook by calling this method!
         print('Data from webhook:', data)
-        print(json.dumps(data, indent=2))
+        print(json.loads(data.replace("'", '"')))
