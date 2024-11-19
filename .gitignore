@@ -104,3 +104,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+src/.vscode/launch.json
+src/.key
+src/.gui_key
