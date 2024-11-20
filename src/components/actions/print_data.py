@@ -1,4 +1,4 @@
-import json
+from datetime import datetime, date
 from components.actions.base.action import Action
 
 
@@ -14,4 +14,3 @@ class PrintData(Action):
         print(self.name, '---> action has run!')
         data = self.validate_data()  # always get data from webhook by calling this method!
         print('Data from webhook:', data)
-        print(json.loads(data.replace("'", '"')))

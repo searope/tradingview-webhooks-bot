@@ -107,3 +107,4 @@ venv.bak/
 src/.vscode/launch.json
 src/.key
 src/.gui_key
+.session
