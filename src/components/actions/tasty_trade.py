@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from components.actions.base.action import Action
-from components.utils.tastytrade import RenewableSession
+from components.utils.tastytrade import TastytradeSession
 
 class TastyTrade(Action):
     def __init__(self):
@@ -24,8 +24,8 @@ class TastyTrade(Action):
         data['DTE'] = int(data['DTE'])
         data['strike'] = float(data['strike'])
 
-        sesh = RenewableSession()
-        account = sesh.get_account()
-        positions = account.get_positions(sesh, include_marks=True)
-        for pos in positions:
+        session = TastytradeSession()
+        account = session.get_account()
+        positions = account.get_positions(TastytradeSession.session, include_marks=True)
+        for pos in [p for p in positions if p.underlying_symbol == data['ticker']]:
             print(pos)        

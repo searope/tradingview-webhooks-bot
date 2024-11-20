@@ -12,38 +12,34 @@ from tastytrade.dxfeed import Greeks, Quote
 from tastytrade.utils import today_in_new_york
 
 
-TOKEN_PATH = '.session'
+class TastytradeSession():
+    session: Session = None
+    accounts: list[Account] = []
 
-
-class RenewableSession(Session):
     def __init__(self):
-        token_path = os.path.join(os.getcwd(), TOKEN_PATH)
-
-        logged_in = False
-        # try to load token
-        if os.path.exists(token_path):
-            with open(token_path, 'rb') as f:
-                self.__dict__ = pickle.load(f)
-
-            # make sure token hasn't expired
-            logged_in = self.validate()
-
-        if not logged_in:
+        if TastytradeSession.session is None or not TastytradeSession.session.validate():
             # either the token expired or doesn't exist
             username, password = self._get_credentials()
-            Session.__init__(self, username, password)
+            TastytradeSession.session = Session(username, password)
 
-            accounts = Account.get_accounts(self)
-            self.accounts = [acc for acc in accounts if not acc.is_closed]
+            TastytradeSession.accounts = [acc for acc in Account.get_accounts(TastytradeSession.session) if not acc.is_closed]
             # write session token to cache
-            os.makedirs(os.path.dirname(token_path), exist_ok=True)
-            with open(token_path, 'wb') as f:
-                pickle.dump(self.__dict__, f)
             print('Logged in with new session, cached for next login.')
         else:
             print('Logged in with cached session.')
 
-    def _get_credentials(self):
+    def get_account(self) -> Account:
+        account = os.getenv('TT_ACCOUNT')
+        if not account:
+            raise Exception('Account number is not provided!')        
+        try:
+            return next(a for a in TastytradeSession.accounts if a.account_number == account)
+        except StopIteration:
+            err_msg = f'Account {account} is provided, but the account doesn\'t appear to exist!'
+            print(err_msg)
+            raise Exception(err_msg)
+    
+    def _get_credentials(self) -> tuple[str, str]:
         username = os.getenv('TT_USERNAME')
         password = os.getenv('TT_PASSWORD')
 
@@ -54,17 +50,6 @@ class RenewableSession(Session):
 
         return username, password
 
-    def get_account(self) -> Account:
-        account = os.getenv('TT_ACCOUNT')
-        if not account:
-            raise Exception('Account number is not provided!')        
-        try:
-            return next(a for a in self.accounts if a.account_number == account)
-        except StopIteration:
-            err_msg = f'Account {account} is provided, but the account doesn\'t appear to exist!'
-            print(err_msg)
-            raise Exception(err_msg)
-    
 
 @dataclass
 class LivePrices:

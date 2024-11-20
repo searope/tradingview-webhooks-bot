@@ -31,6 +31,10 @@ def start(
         workers: int = typer.Option(
             default=1,
             help='Number of workers to run the server with.',
+        ),
+        waitress: bool = typer.Option(
+            default=False,
+            help='Run the server using the Waitress WSGI server.',
         )
 ):
     def clear_gui_key():
@@ -63,8 +67,10 @@ def start(
 
     def run_server():
         print("Close server with Ctrl+C in terminal.")
-        run(f'gunicorn --bind {host}:{port} wsgi:app --workers {workers}'.split(' '))
-        # run(f'waitress-serve --listen={host}:{port} --threads={workers} wsgi:app')
+        if waitress:
+            run(f'waitress-serve --listen={host}:{port} wsgi:app')
+        else:
+            run(f'gunicorn --bind {host}:{port} wsgi:app --workers {workers}'.split(' '))
 
     # clear gui key if gui is set to open, else generate key
     # Flask uses the existence of the key file to determine GUI mode
