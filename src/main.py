@@ -1,4 +1,6 @@
 # initialize our Flask application
+import os
+
 from logging import getLogger, DEBUG
 
 from flask import Flask, request, jsonify, render_template, Response
@@ -35,13 +37,19 @@ def dashboard():
 
         # check if gui key file exists
         try:
-            with open('.gui_key', 'r') as key_file:
-                gui_key = key_file.read().strip()
-                # check that the gui key from file matches the gui key from request
-                if gui_key == request.args.get('guiKey', None):
-                    pass
-                else:
-                    return 'Access Denied', 401
+            if os.path.exists('.gui_key'):
+                with open('.gui_key', 'r') as key_file:
+                    gui_key = key_file.read().strip()
+                    # check that the gui key from file matches the gui key from request
+                    if gui_key == request.args.get('guiKey', None):
+                        pass
+                    else:
+                        return 'Access Denied', 401
+            else:
+                import secrets
+                token = secrets.token_urlsafe(24)
+                logger.info(f'Generated new GUI key: {token}')
+                open('.gui_key', 'w').write(token)
 
         # if gui key file does not exist, the tvwb.py did not start gui in closed mode
         except FileNotFoundError:
