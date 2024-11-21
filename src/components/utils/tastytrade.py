@@ -10,6 +10,10 @@ from tastytrade import Account, Session, DXLinkStreamer
 from tastytrade.instruments import get_option_chain, Option, OptionType
 from tastytrade.dxfeed import Greeks, Quote
 from tastytrade.utils import today_in_new_york
+from utils.log import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class TastytradeSession():
@@ -24,9 +28,9 @@ class TastytradeSession():
 
             TastytradeSession.accounts = [acc for acc in Account.get_accounts(TastytradeSession.session) if not acc.is_closed]
             # write session token to cache
-            print('Logged in with new session, cached for next login.')
+            logger.info('Logged in with new session, cached for next login.')
         else:
-            print('Logged in with cached session.')
+            logger.info('Logged in with cached session.')
 
     def get_account(self) -> Account:
         account = os.getenv('TT_ACCOUNT')
@@ -36,7 +40,7 @@ class TastytradeSession():
             return next(a for a in TastytradeSession.accounts if a.account_number == account)
         except StopIteration:
             err_msg = f'Account {account} is provided, but the account doesn\'t appear to exist!'
-            print(err_msg)
+            logger.error(err_msg)
             raise Exception(err_msg)
     
     def _get_credentials(self) -> tuple[str, str]:

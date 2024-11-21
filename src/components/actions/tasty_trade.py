@@ -1,6 +1,9 @@
 from datetime import datetime, date
 from components.actions.base.action import Action
 from components.utils.tastytrade import TastytradeSession
+from utils.log import get_logger
+
+logger = get_logger(__name__)
 
 class TastyTrade(Action):
     def __init__(self):
@@ -28,4 +31,4 @@ class TastyTrade(Action):
         account = session.get_account()
         positions = account.get_positions(TastytradeSession.session, include_marks=True)
         for pos in [p for p in positions if p.underlying_symbol == data['ticker']]:
-            print(pos)        
+            logger.info(str(pos))        
