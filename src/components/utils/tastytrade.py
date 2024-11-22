@@ -20,6 +20,19 @@ class TastytradeSession():
     session: Session = None
     accounts: list[Account] = []
 
+    @staticmethod
+    def get_account(account_number: str = None) -> Account:
+        if not account_number:
+            account_number = os.getenv('TT_ACCOUNT')
+        if not account_number:
+            raise Exception('Account number is not provided!')        
+        try:
+            return next(a for a in TastytradeSession.accounts if a.account_number == account_number)
+        except StopIteration:
+            err_msg = f'Account {account_number} is provided, but the account doesn\'t appear to exist!'
+            logger.error(err_msg)
+            raise Exception(err_msg)
+    
     def __init__(self):
         if TastytradeSession.session is None or not TastytradeSession.session.validate():
             # either the token expired or doesn't exist
@@ -32,17 +45,6 @@ class TastytradeSession():
         else:
             logger.info('Logged in with cached session.')
 
-    def get_account(self) -> Account:
-        account = os.getenv('TT_ACCOUNT')
-        if not account:
-            raise Exception('Account number is not provided!')        
-        try:
-            return next(a for a in TastytradeSession.accounts if a.account_number == account)
-        except StopIteration:
-            err_msg = f'Account {account} is provided, but the account doesn\'t appear to exist!'
-            logger.error(err_msg)
-            raise Exception(err_msg)
-    
     def _get_credentials(self) -> tuple[str, str]:
         username = os.getenv('TT_USERNAME')
         password = os.getenv('TT_PASSWORD')
