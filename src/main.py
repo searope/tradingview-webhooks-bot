@@ -1,14 +1,10 @@
 # initialize our Flask application
 import os
 
-from logging import getLogger, DEBUG
+from flask import Flask, request, render_template, Response
 
-from flask import Flask, request, jsonify, render_template, Response
-
-from commons import VERSION_NUMBER, LOG_LOCATION
 from components.actions.base.action import am
 from components.events.base.event import em
-from components.logs.log_event import LogEvent
 from components.schemas.trading import Order, Position
 from utils.log import get_logger
 from utils.register import register_action, register_event, register_link
@@ -35,25 +31,17 @@ schema_list = {
 def dashboard():
     if request.method == 'GET':
 
-        # check if gui key file exists
-        try:
-            if os.path.exists('.gui_key'):
-                with open('.gui_key', 'r') as key_file:
-                    gui_key = key_file.read().strip()
-                    # check that the gui key from file matches the gui key from request
-                    if gui_key == request.args.get('guiKey', None):
-                        pass
-                    else:
-                        return 'Access Denied', 401
-            else:
-                import secrets
-                token = secrets.token_urlsafe(24)
-                logger.info(f'Generated new GUI key: {token}')
-                open('.gui_key', 'w').write(token)
-
-        # if gui key file does not exist, the tvwb.py did not start gui in closed mode
-        except FileNotFoundError:
-            logger.warning('GUI key file not found. Open GUI mode detected.')
+        gui_key = os.getenv('GUI_KEY')
+        if gui_key is None or gui_key != request.args.get('gui_key'):
+            logger.error('Invalid or missing GUI_KEY.')
+            return 'Access Denied', 401
+        
+        '''
+        import secrets
+        token = secrets.token_urlsafe(24)
+        logger.info(f'Generated new GUI key: {token}')
+        open('.gui_key', 'w').write(token)
+        '''
 
         # serve the dashboard
         action_list = am.get_all()
@@ -62,7 +50,7 @@ def dashboard():
             schema_list=schema_list,
             action_list=action_list,
             event_list=registered_events,
-            version=VERSION_NUMBER
+            version=0.5
         )
 
 
@@ -74,7 +62,7 @@ async def webhook():
             logger.error(f'Error getting JSON data from request...')
             logger.error(f'Request data: {request.data}')
             logger.error(f'Request headers: {request.headers}')
-            return 'Error getting JSON data from request', 400
+            return 'Error getting JSON data from request', 415
 
         logger.info(f'Request Data: {data}')
         triggered_events = []
@@ -90,34 +78,6 @@ async def webhook():
             logger.info(f'Triggered events: {triggered_events}')
 
     return Response(status=200)
-
-
-@app.route("/logs", methods=["GET"])
-def get_logs():
-    if request.method == 'GET':
-        log_file = open(LOG_LOCATION, 'r')
-        logs = [LogEvent().from_line(log) for log in log_file.readlines()]
-        return jsonify([log.as_json() for log in logs])
-
-
-@app.route("/event/active", methods=["POST"])
-def activate_event():
-    if request.method == 'POST':
-        # get query parameters
-        event_name = request.args.get('event', None)
-
-        # if event name is not provided, or cannot be found, 404
-        if event_name is None:
-            return Response(f'Event name cannot be empty ({event_name})', status=404)
-        try:
-            event = em.get(event_name)
-        except ValueError:
-            return Response(f'Cannot find event with name: {event_name}', status=404)
-
-        # set event to active or inactive, depending on current state
-        event.active = request.args.get('active', True) == 'true'
-        logger.info(f'Event {event.name} active set to: {event.active}, via POST request')
-        return {'active': event.active}
 
 
 if __name__ == '__main__':

@@ -1,10 +1,8 @@
-import asyncio
 import os
-import pickle
+import asyncio
 
 from datetime import date
 from dataclasses import dataclass
-from importlib.resources import as_file, files
 
 from tastytrade import Account, Session, DXLinkStreamer
 from tastytrade.instruments import get_option_chain, Option, OptionType

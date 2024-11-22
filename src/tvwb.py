@@ -18,10 +18,6 @@ logger = get_logger(__name__)
 
 @app.command('start')
 def start(
-        open_gui: bool = typer.Option(
-            default=False,
-            help='Determines whether the GUI should be served at the root path, or behind a unique key.',
-        ),
         host: str = typer.Option(
             default='0.0.0.0'
         ),
@@ -37,51 +33,24 @@ def start(
             help='Run the server using the Waitress WSGI server.',
         )
 ):
-    def clear_gui_key():
-        try:
-            os.remove('.gui_key')
-        except FileNotFoundError:
-            pass
-
-    def generate_gui_key():
-        import secrets
-        if os.path.exists('.gui_key'):
-            pass
-        else:
-            open('.gui_key', 'w').write(secrets.token_urlsafe(24))
-
-    def read_gui_key():
-        return open('.gui_key', 'r').read()
-
-    def print_gui_info():
-        if open_gui:
-            print('GUI is set to [OPEN] - it will be served at the root path.')
-            print(f'\n\tView GUI dashboard here: http://{host}:{port}\n')
-        else:
-            print('GUI is set to [CLOSED] - it will be served at the path /?guiKey=<unique_key>')
-            print(f'\n\tView GUI dashboard here: http://{host}:{port}?guiKey={read_gui_key()}\n')
-            print(
-                'To run the GUI in [OPEN] mode (for development purposes only), run the following command: tvwb start --open-gui')
-            gui_modes_url = 'https://github.com/robswc/tradingview-webhooks-bot/discussions/43'
-            print(f'To learn more about GUI modes, visit: {gui_modes_url}')
+    def output_gui_info():
+        logger.info('GUI is served at the path /?guiKey=<unique_key>')
+        logger.info(f'\n\tView GUI dashboard here: http://{host}:{port}?guiKey=your_gui_key_set_as_env_var\n')
 
     def run_server():
-        print("Close server with Ctrl+C in terminal.")
+        logger.info("Close server with Ctrl+C in terminal.")
         if waitress:
             run(f'waitress-serve --listen={host}:{port} wsgi:app')
         else:
             run(f'gunicorn --bind {host}:{port} wsgi:app --workers {workers}'.split(' '))
 
-    # clear gui key if gui is set to open, else generate key
-    # Flask uses the existence of the key file to determine GUI mode
-    if open_gui:
-        clear_gui_key()
-    else:
-        generate_gui_key()
-
     # print info regarding GUI and run the server
-    print_gui_info()
-    run_server()
+    output_gui_info()
+    if os.getenv('GUI_KEY') is None or os.getenv('WEBHOOK_KEY') is None \
+        or os.getenv('TT_ACCOUNT') is None or os.getenv('TT_USERNAME') is None or os.getenv('TT_PASSWORD') is None: 
+        logger.error('Missing environment variables. Please set GUI_KEY, WEBHOOK_KEY, TT_ACCOUNT, TT_USERNAME, TT_PASSWORD')
+    else:
+        run_server()
 
 
 @app.command('action:create')

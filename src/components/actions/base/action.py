@@ -1,7 +1,3 @@
-import datetime
-from logging import getLogger, DEBUG
-
-from components.logs.log_event import LogEvent
 from utils.log import get_logger
 
 logger = get_logger(__name__)
@@ -32,13 +28,6 @@ class ActionManager:
 
 
 am = ActionManager()
-
-
-class ActionLogEvent:
-    def __init__(self, status, msg):
-        self.timestamp = datetime.datetime.now()
-        self.status = status
-        self.msg = msg
 
 
 class Action:
@@ -83,7 +72,4 @@ class Action:
         """
         Runs, logs action
         """
-        self.logs.append(ActionLogEvent('INFO', 'action run'))
-        log_event = LogEvent(self.name, 'action_run', datetime.datetime.now(), f'{self.name} triggered')
-        log_event.write()
         logger.info(f'ACTION TRIGGERED --->\t{str(self)}')
