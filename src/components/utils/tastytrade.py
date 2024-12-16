@@ -1,8 +1,6 @@
 import os
 import asyncio
-import requests 
 
-from collections import defaultdict
 from decimal import Decimal
 from datetime import date, datetime
 from dataclasses import dataclass, field
@@ -24,9 +22,8 @@ from tastytrade.metrics import MarketMetricInfo, a_get_market_metrics
 from tastytrade.order import (NewOrder, NewComplexOrder, OrderAction, OrderType, OrderTimeInForce, PriceEffect, PlacedOrderResponse, TradeableTastytradeJsonDataclass)
 from tastytrade.streamer import EventType
 from tastytrade.utils import today_in_new_york, now_in_new_york, TastytradeError
-from utils.log import get_logger
+from utils.log import get_logger, log_error
 
-NTFY_TOPIC = os.getenv('NTFY_TOPIC')
 logger = get_logger(__name__)
 ZERO = Decimal(0)
 
@@ -34,6 +31,9 @@ ZERO = Decimal(0)
 @dataclass
 class Position(CurrentPosition):
     streamer_symbol:str = None
+    direction:int = None
+    strike_price:Decimal = None
+    close_price_prev:Decimal = None
     day_change:Decimal = None
     pnl_day:Decimal = None
     pnl_total:Decimal = None
@@ -55,10 +55,13 @@ class Position(CurrentPosition):
 @dataclass 
 class PositionsSummary:
     positions:List[Position] = field(default_factory=list)
+    net_liquidity:Decimal = Decimal(0)
     pnl_total:Decimal = Decimal(0)
     pnl_day:Decimal = Decimal(0)
+    delta:Decimal = Decimal(0)
+    theta:Decimal = Decimal(0)
+    gamma:Decimal = Decimal(0)
     beta_weighted_delta:Decimal = Decimal(0)
-    net_liquidity:Decimal = Decimal(0)
 
 
 class TastytradeSessionMeta(type):
@@ -165,28 +168,18 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
         # modified to use our error handling
         if response.status_code // 100 != 2:
             content = response.json()['error']
-            self.log_error(f"{content['message']}")
+            log_error(f"{content['message']}", logger=logger)
             errors = content.get('errors')
             if errors is not None:
                 for error in errors:
                     if "code" in error:
-                        self.log_error(f"{error['message']}")
+                        log_error(f"{error['message']}", logger=logger)
                     else:
-                        self.log_error(f"{error['reason']}")
+                        log_error(f"{error['reason']}", logger=logger)
             return None
         else:
             data = response.json()['data']
             return PlacedOrderResponse(**data)
-
-
-    def log_error(self, message: str, header: str = None):
-        if header is None:
-            error_msg = 'ERROR: ' + message
-        else:
-            error_msg = header + '\n' + message
-        logger.error(error_msg)
-        if NTFY_TOPIC:
-            requests.post(f'https://ntfy.sh/{NTFY_TOPIC}', data=(error_msg).encode(encoding='utf-8'))
 
 
     async def send_option_order(self, option_type: OptionType,
@@ -214,16 +207,16 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
             error_msg.append('Specify stop price for stop orders.')
         if expiration is None and dte is None:
             error_msg.append('Specify either expiration or dte for the option.')
-        if width is None or width <= 0:
-            error_msg.append('Width must be a positive integer where 1 means next strike etc.')
-        if width is not None and order_type == OrderType.MARKET:
-            error_msg.append('Width (ie spread) is not supported for market orders.')            
         if strike is not None and delta is not None:
             error_msg.append('Specify either delta or strike, but not both.')
         if not strike and not delta:
             error_msg.append('Specify either delta or strike for the option.')
         if delta is not None and abs(delta) > 99:
             error_msg.append('Delta value is too high, -99 <= delta <= 99.')
+        if width is not None and width <= 0:
+            error_msg.append('Width must be a positive integer where 1 means next strike etc.')
+        if width is not None and order_type == OrderType.MARKET:
+            error_msg.append('Width (ie spread) is not supported for market orders.')            
 
         tt_session:Session = TastytradeSession.get_session()
         if tt_session is None:
@@ -255,7 +248,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                     tick_size = chain.tick_sizes[0].value
 
         if len(error_msg) > 0:
-            self.log_error('\n'.join(error_msg), error_header)
+            log_error('\n'.join(error_msg), error_header, logger)
             return
 
         # precision = tick_size.as_tuple().exponent
@@ -288,7 +281,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
             else:
                 spread_strikes = [s for s in sorted(subchain.strikes, key=lambda x: x.strike_price, reverse=True) if s.strike_price < option_at_strike.strike_price]
             if len(spread_strikes) < width:
-                self.log_error(f'No second leg strikes available for {option_type_str} spread with strike {option_at_strike.strike_price} and width {width}.', error_header)
+                log_error(f'No second leg strikes available for {option_type_str} spread with strike {option_at_strike.strike_price} and width {width}.', error_header, logger)
                 return
             spread_strike = spread_strikes[width - 1]
 
@@ -358,7 +351,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                 price_effect=PriceEffect.CREDIT if quantity < 0 else PriceEffect.DEBIT
             )
         else:
-            self.log_error(f'Invalid order type {order_type}. Accepted order types are {accepted_order_types}', error_header)
+            log_error(f'Invalid order type {order_type}. Accepted order types are {accepted_order_types}', error_header, logger)
             return
         
         acc = TastytradeSession.get_account()
@@ -379,7 +372,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
             err_msg = str(e) + f'\nOptions BP: ${acc_balances.derivative_buying_power}'
             if price is not None:
                 err_msg += f'\nPrice: {price}'
-            self.log_error(err_msg, error_header)
+            log_error(err_msg, error_header, logger)
             return
         
         order_resp:PlacedOrderResponse = acc.place_order(tt_session, order, dry_run=False)
@@ -391,7 +384,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                 Buying power effect: {order_resp.buying_power_effect}, {order_resp.buying_power_effect / nl * Decimal(100):.2f}%\n\
                 Fees: {order_resp.fee_calculation}')
         else:
-            self.log_error(f'Order placement failed. Errors:\n\t{'\n\t'.join([f'code: {o.code}\tmessage: {o.message}' for o in order_resp.errors])}', error_header)
+            log_error(f'Order placement failed. Errors:\n\t{'\n\t'.join([f'code: {o.code}\tmessage: {o.message}' for o in order_resp.errors])}', error_header, logger)
 
 
     async def get_positions(self, account:Account = None) -> PositionsSummary:
@@ -416,8 +409,6 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                 options_task = tg.create_task(Option.a_get_options(TastytradeSession.session, options_symbols))
             else:
                 options_task = None
-            # options = (Option.get_options(TastytradeSession.session, options_symbols)
-            #         if options_symbols else [])
             
             future_options_symbols = [
                 p.symbol
@@ -428,10 +419,6 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                 future_options_task = tg.create_task(FutureOption.a_get_future_options(TastytradeSession.session, future_options_symbols))
             else:
                 future_options_task = None
-            # future_options = (
-            #     FutureOption.get_future_options(TastytradeSession.session, future_options_symbols)
-            #     if future_options_symbols else []
-            # )
             
             equity_symbols = [
                 p.symbol 
@@ -441,7 +428,6 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                 equities_task = tg.create_task(Equity.a_get_equities(TastytradeSession.session, equity_symbols))
             else:
                 equities_task = None
-            #equities = await Equity.a_get_equities(TastytradeSession.session, equity_symbols) if equity_symbols else []
 
             crypto_symbols = [
                 p.symbol
@@ -452,8 +438,6 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                 cryptos_task = tg.create_task(Cryptocurrency.a_get_cryptocurrencies(TastytradeSession.session, crypto_symbols))
             else:
                 cryptos_task = None
-            # cryptos = (Cryptocurrency.get_cryptocurrencies(TastytradeSession.session, crypto_symbols)
-            #         if crypto_symbols else [])
         
         options = options_task.result() if options_task else []
         future_options = future_options_task.result() if future_options_task else []
@@ -470,7 +454,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
         
         options_dict = {o.symbol: o for o in options}
         future_options_dict = {fo.symbol: fo for fo in future_options}
-        equity_dict = {e.symbol: e for e in equities}
+        #equity_dict = {e.symbol: e for e in equities}
         futures_dict = {f.symbol: f for f in futures}
         crypto_dict = {c.symbol: c for c in cryptos}
 
@@ -509,21 +493,23 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
         for i, pos in enumerate(positions):
             ps = Position(pos)
             mark_price = pos.mark_price or 0 # current price of the position. For options, it's an option price 
-            mark = pos.mark or 0 # mark_price * quantity * multiplier, i.e. total value of the position, it's net liquidity
-            direction = (1 if pos.quantity_direction == 'Long' else -1)
+            mark = pos.mark or 0 # mark_price * quantity * multiplier, i.e. total value of the position, i.e. net liquidity
+            ps.direction = (1 if pos.quantity_direction == 'Long' else -1)
             # instrument type specific calculations
             if pos.instrument_type == InstrumentType.EQUITY_OPTION:
                 o = options_dict[pos.symbol]
                 ps.streamer_symbol = o.streamer_symbol
+                ps.strike_price = o.strike_price
+                ps.close_price_prev = summary_dict[o.streamer_symbol].prevDayClosePrice
                 metrics = metrics_dict[o.underlying_symbol]
-                ps.day_change = mark_price - (summary_dict[o.streamer_symbol].prevDayClosePrice or ZERO)  # type: ignore
+                ps.day_change = mark_price - (ps.close_price_prev or ZERO)  # type: ignore
                 ps.pnl_day = ps.day_change * pos.quantity * pos.multiplier
-                ps.pnl_total = direction * (mark_price - pos.average_open_price) * pos.multiplier
+                ps.pnl_total = ps.direction * (mark_price - pos.average_open_price) * pos.multiplier
                 ps.trade_price = pos.average_open_price * pos.multiplier
                 ps.iv_rank = (metrics.tos_implied_volatility_index_rank or 0) * 100 # to percentage
-                ps.delta = greeks_dict[o.streamer_symbol].delta * pos.multiplier * direction  # type: ignore
-                ps.theta = greeks_dict[o.streamer_symbol].theta * pos.multiplier * direction  # type: ignore
-                ps.gamma = greeks_dict[o.streamer_symbol].gamma * pos.multiplier * direction  # type: ignore
+                ps.delta = greeks_dict[o.streamer_symbol].delta * pos.multiplier * ps.direction  # type: ignore
+                ps.theta = greeks_dict[o.streamer_symbol].theta * pos.multiplier * ps.direction  # type: ignore
+                ps.gamma = greeks_dict[o.streamer_symbol].gamma * pos.multiplier * ps.direction  # type: ignore
                 beta = metrics.beta or 0
                 # BWD = beta * stock price * delta / index price
                 ps.beta_weighted_delta = beta *  mark * ps.delta / spy_price
@@ -533,31 +519,34 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                     ps.earnings_next_date = metrics.earnings.expected_report_date
             elif pos.instrument_type == InstrumentType.FUTURE_OPTION:
                 o = future_options_dict[pos.symbol]
+                f = futures_dict[o.underlying_symbol]
                 ps.streamer_symbol = o.streamer_symbol
+                ps.strike_price = o.strike_price
+                ps.close_price_prev = summary_dict[f.streamer_symbol].prevDayClosePrice
                 metrics = metrics_dict[o.root_symbol]
-                ps.delta = greeks_dict[o.streamer_symbol].delta * pos.multiplier * direction
-                ps.theta = greeks_dict[o.streamer_symbol].theta * pos.multiplier * direction
-                ps.gamma = greeks_dict[o.streamer_symbol].gamma * pos.multiplier * direction
+                ps.delta = greeks_dict[o.streamer_symbol].delta * pos.multiplier * ps.direction
+                ps.theta = greeks_dict[o.streamer_symbol].theta * pos.multiplier * ps.direction
+                ps.gamma = greeks_dict[o.streamer_symbol].gamma * pos.multiplier * ps.direction
                 ps.dividend_next_date = metrics.dividend_next_date
                 if metrics.earnings:
                     ps.earnings_next_date = metrics.earnings.expected_report_date
-                f = futures_dict[o.underlying_symbol]
                 beta = metrics.beta or 0
                 # BWD = beta * stock price * delta / index price
-                ps.beta_weighted_delta = beta * (summary_dict[f.streamer_symbol].prevDayClosePrice or ZERO) * ps.delta / spy_price
+                ps.beta_weighted_delta = beta * (ps.close_price_prev or ZERO) * ps.delta / spy_price
                 ps.net_liquidity = mark_price * pos.quantity * pos.multiplier
                 ps.iv_rank = (metrics.tos_implied_volatility_index_rank or 0) * 100 # to percentage
                 ps.trade_price = pos.average_open_price / f.display_factor
-                ps.pnl_total = direction * (mark_price - ps.trade_price)
-                ps.day_change = mark_price - (summary_dict[f.streamer_symbol].prevDayClosePrice or ZERO)  # type: ignore                
+                ps.pnl_total = ps.direction * (mark_price - ps.trade_price)
+                ps.day_change = mark_price - (ps.close_price_prev or ZERO)  # type: ignore                
                 ps.pnl_day = ps.day_change * pos.quantity * pos.multiplier
             elif pos.instrument_type == InstrumentType.EQUITY:
+                #e = equity_dict[pos.symbol]
                 ps.streamer_symbol = pos.symbol
+                ps.close_price_prev = summary_dict[pos.symbol].prevDayClosePrice
                 ps.theta = 0
                 ps.gamma = 0
-                ps.delta = pos.quantity * direction
+                ps.delta = pos.quantity * ps.direction
                 metrics = metrics_dict[pos.symbol]
-                e = equity_dict[pos.symbol]
                 ps.dividend_next_date = metrics.dividend_next_date
                 if metrics.earnings:
                     ps.earnings_next_date = metrics.earnings.expected_report_date
@@ -566,15 +555,16 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                 ps.beta_weighted_delta = beta * mark_price * ps.delta / spy_price
                 ps.net_liquidity = mark_price * pos.quantity
                 ps.iv_rank = (metrics.tos_implied_volatility_index_rank or 0) * 100 # to percentage
-                ps.pnl_total = mark - pos.average_open_price * pos.quantity * direction
+                ps.pnl_total = mark - pos.average_open_price * pos.quantity * ps.direction
                 ps.trade_price = pos.average_open_price
-                ps.day_change = mark_price - (summary_dict[pos.symbol].prevDayClosePrice or ZERO)  # type: ignore
+                ps.day_change = mark_price - (ps.close_price_prev or ZERO)  # type: ignore
                 ps.pnl_day = ps.day_change * pos.quantity
             elif pos.instrument_type == InstrumentType.FUTURE:
+                f = futures_dict[pos.symbol]
+                ps.close_price_prev = summary_dict[f.streamer_symbol].prevDayClosePrice
                 ps.theta = 0
                 ps.gamma = 0
-                ps.delta = pos.quantity * direction * pos.multiplier
-                f = futures_dict[pos.symbol]
+                ps.delta = pos.quantity * ps.direction * pos.multiplier
                 ps.streamer_symbol = f.streamer_symbol
                 metrics = metrics_dict[f.future_product.root_symbol]  # type: ignore
                 ps.dividend_next_date = metrics.dividend_next_date
@@ -586,39 +576,43 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                 ps.net_liquidity = mark_price * pos.quantity * pos.multiplier
                 ps.iv_rank = (metrics.tw_implied_volatility_index_rank or 0) * 100 # to percentage
                 ps.trade_price = pos.average_open_price * f.notional_multiplier
-                ps.pnl_total = direction * (mark_price - ps.trade_price) * pos.quantity
-                ps.day_change = mark_price - (summary_dict[f.streamer_symbol].prevDayClosePrice or ZERO)  # type: ignore
+                ps.pnl_total = ps.direction * (mark_price - ps.trade_price) * pos.quantity
+                ps.day_change = mark_price - (ps.close_price_prev or ZERO)  # type: ignore
                 ps.pnl_day = ps.day_change * pos.quantity * pos.multiplier
             elif pos.instrument_type == InstrumentType.CRYPTOCURRENCY:
+                c = crypto_dict[pos.symbol]
+                ps.close_price_prev = summary_dict[c.streamer_symbol].prevDayClosePrice
                 ps.theta = 0
                 ps.gamma = 0
                 ps.delta = 0
                 ps.beta_weighted_delta = 0
                 ps.net_liquidity = mark_price * pos.quantity
                 ps.iv_rank = None
-                ps.pnl_total = mark - pos.average_open_price * pos.quantity * direction
+                ps.pnl_total = mark - pos.average_open_price * pos.quantity * ps.direction
                 ps.trade_price = pos.average_open_price
                 ps.quantity = round(pos.quantity, 2)
-                c = crypto_dict[pos.symbol]
                 ps.streamer_symbol = c.streamer_symbol
-                ps.day_change = mark_price - (summary_dict[c.streamer_symbol].prevDayClosePrice or ZERO)  # type: ignore
+                ps.day_change = mark_price - (ps.close_price_prev or ZERO)  # type: ignore
                 ps.pnl_day = ps.day_change * pos.quantity * pos.multiplier
             else:
-                self.log_error(f'Skipping {pos.symbol}, unknown instrument type {pos.instrument_type}!')
+                log_error(f'Skipping {pos.symbol}, unknown instrument type {pos.instrument_type}!', logger=logger)
                 continue
 
             if ps.created_at.date() == today:
                 ps.pnl_day = ps.pnl_total
             sums.pnl_total += ps.pnl_total
             sums.pnl_day += ps.pnl_day
-            sums.beta_weighted_delta += ps.beta_weighted_delta
             sums.net_liquidity += ps.net_liquidity
+            sums.delta += ps.delta
+            sums.theta += ps.theta
+            sums.gamma += ps.gamma
+            sums.beta_weighted_delta += ps.beta_weighted_delta
             sums.positions.append(ps)
         return sums
 """             
             row.extend([
                 pos.symbol,
-                f'{pos.quantity * direction:g}',
+                f'{pos.quantity * ps.direction:g}',
                 conditional_color(pnl_day),
                 conditional_color(pnl)
             ])

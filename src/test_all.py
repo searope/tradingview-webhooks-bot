@@ -19,11 +19,11 @@ from typing import (
     overload,
 )
 
-#asyncio.run(test_SPY_not_enough_money())
-#asyncio.run(test_ES_not_enough_money())
+#asyncio.run(test.test_SPY_not_enough_money())
+asyncio.run(test.test_ES_not_enough_money())
 
 #asyncio.run(test.test_SPY_call_spread())
 #asyncio.run(test.test_SPY_put_spread())
 
 #asyncio.run(test.test_SPY_call_delta())
-asyncio.run(test.test_get_positions())
+#asyncio.run(test.test_get_positions())
