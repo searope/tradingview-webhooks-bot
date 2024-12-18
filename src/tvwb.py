@@ -39,7 +39,7 @@ def start(
 
     def run_server():
         logger.info("Close server with Ctrl+C in terminal.")
-        run(f'uvicorn --host {host} --port {port} --workers {workers} main:app')
+        run(f'uvicorn --host {host} --port {port} --workers {workers} main:app'.split(' '))
         #run(f'gunicorn --bind {host}:{port} wsgi:app --workers {workers} -k uvicorn.workers.UvicornWorker'.split(' '))
         # if waitress:
         #     run(f'waitress-serve --listen={host}:{port} wsgi:app')
