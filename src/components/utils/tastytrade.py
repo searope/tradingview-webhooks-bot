@@ -111,7 +111,7 @@ class TastytradeSessionMeta(type):
         accounts = [acc for acc in Account.get_accounts(session) if not acc.is_closed]
         attrs['accounts'] = accounts 
         logger.info(f'New session is created at the start of the program.')
-        logger.info(f'Accounts {', '.join([a.account_number for a in accounts])} are available for trading.')
+        logger.info(f'Accounts {", ".join([a.account_number for a in accounts])} are available for trading.')
         return super().__new__(cls, name, bases, attrs)
 
 
