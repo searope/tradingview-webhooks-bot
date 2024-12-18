@@ -1,8 +1,6 @@
 import re
 
 # configure logging
-from logging import getLogger, DEBUG
-
 from utils.log import get_logger
 
 logger = get_logger(__name__)

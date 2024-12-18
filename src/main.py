@@ -1,4 +1,3 @@
-# initialize our Flask application
 import os
 import uvicorn
 
