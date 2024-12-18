@@ -27,10 +27,6 @@ def start(
         workers: int = typer.Option(
             default=1,
             help='Number of workers to run the server with.',
-        ),
-        waitress: bool = typer.Option(
-            default=False,
-            help='Run the server using the Waitress WSGI server.',
         )
 ):
     def output_gui_info():
@@ -40,11 +36,6 @@ def start(
     def run_server():
         logger.info("Close server with Ctrl+C in terminal.")
         run(f'uvicorn --host {host} --port {port} --workers {workers} main:app'.split(' '))
-        #run(f'gunicorn --bind {host}:{port} wsgi:app --workers {workers} -k uvicorn.workers.UvicornWorker'.split(' '))
-        # if waitress:
-        #     run(f'waitress-serve --listen={host}:{port} wsgi:app')
-        # else:
-        #     run(f'gunicorn --bind {host}:{port} wsgi:app --workers {workers}'.split(' '))
 
     # print info regarding GUI and run the server
     output_gui_info()

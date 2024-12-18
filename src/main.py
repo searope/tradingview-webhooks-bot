@@ -2,8 +2,8 @@
 import os
 import uvicorn
 
-from fastapi import FastAPI, Request
-from flask import Flask, request, render_template, Response
+from fastapi import FastAPI, Request, Response
+from starlette.templating import Jinja2Templates
 
 from components.actions.base.action import am
 from components.events.base.event import em
@@ -20,6 +20,7 @@ registered_links = [register_link(link, em, am) for link in REGISTERED_LINKS]
 
 #app = Flask(__name__)
 app = FastAPI()
+templates = Jinja2Templates(directory='templates')
 
 # configure logging
 logger = get_logger(__name__)
@@ -29,7 +30,6 @@ schema_list = {
     'position': Position().as_json()
 }
 
-#@app.route("/", methods=["GET"])
 @app.get("/")
 async def dashboard(request: Request):
     gui_key = os.getenv('GUI_KEY')
@@ -47,16 +47,18 @@ async def dashboard(request: Request):
     # serve the dashboard
     action_list = am.get_all()
 
-    return render_template(
-        template_name_or_list='dashboard.html',
-        schema_list=schema_list,
-        action_list=action_list,
-        event_list=registered_events,
-        version=0.5
+    return templates.TemplateResponse(
+        request=request,
+        name='dashboard.html',
+        context={
+            'schema_list': schema_list,
+            'action_list': action_list,
+            'event_list': registered_events,
+            'version': 0.5
+        }
     )
 
 
-#@app.route("/webhook", methods=["POST"])
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
@@ -79,7 +81,7 @@ async def webhook(request: Request):
     else:
         logger.info(f'Triggered events: {triggered_events}')
 
-    return Response(status=200)
+    return Response(status_code=200)
 
 
 if __name__ == '__main__':
