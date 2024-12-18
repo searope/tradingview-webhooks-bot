@@ -1,46 +1,74 @@
-import asyncio
-import json
+import simplejson as json
 
-from dataclasses import dataclass
+from dataclasses import asdict
 from datetime import datetime, date
 from decimal import Decimal
-from enum import Enum
 from tastytrade import Account
 from tastytrade.account import AccountBalance
+from tastytrade.instruments import InstrumentType
 
 from components.actions.base.action import Action
-from components.utils.tastytrade import TastytradeSession, PositionSummary
+from components.utils.tastytrade import TastytradeSession, PositionsSummary, WebHookData, OrderDirection, serialize_datetime
 from utils.log import get_logger, log_error
 
 logger = get_logger(__name__)
 
-class Action(Enum):
-    BTO = 'BTO'
-    STO = 'STO'
-    BTC = 'BTC'
-    STC = 'STC'
-
-@dataclass
-class WebHookData:
-    ticker: str
-    price: Decimal
-    timestamp: datetime
-    action: Action
-    quantity: int
-    expiration: date
-    # DTE: int
-    strike: Decimal
 
 class TastyTrade(Action):
     def __init__(self):
         super().__init__()
     
-    def validate_data(self) -> WebHookData:
+    async def run(self, *args, **kwargs):
+        super().run(*args, **kwargs)  # this is required
+        """
+        Custom run method. Add your custom logic here.
+        """
+        print(self.name, '---> action has run!')
+        # data = self.validate_data()   # always get data from webhook by calling this method!
+        try:
+            data = self.get_webhook_data()
+            # {'ticker': 'S1!', 'price': '5935', 'timestamp': '2024-11-19T20:28:17Z', 'action': 'STO', 'quantity': 1, 'expiration': '2025-08-15', 'DTE': 365, 'strike': 650.0, 'key': 'WebhookReceived:f5f3f4'}
+        except ValueError as e:
+            log_error(e.args[0], json.dumps(asdict(self.data), indent=4, default=serialize_datetime), logger)
+            return
+        
+        tt_session = TastytradeSession()
+        account: Account = tt_session.get_account()
+        balances: AccountBalance = account.get_balances(tt_session.session)
+        ps:PositionsSummary = await tt_session.get_positions()
+
+        self.loging(data, account, balances)
+
+        # equity option positions
+        ticker_positions = [p for p in ps.positions if p.underlying_symbol == data.ticker and p.instrument_type == InstrumentType.EQUITY_OPTION]
+        err_msg = None
+        if not ticker_positions:
+            err_msg = f'No options positions found for {data.ticker}'
+        else:
+            strike_positions = [p for p in ticker_positions if p.strike_price == data.strike]
+            if not strike_positions:
+                err_msg = f'No options positions found for {data.ticker} ${data.strike}'
+            else:
+                expiration_positions = [p for p in strike_positions if p.expires_at.date() == data.expiration]
+                if not expiration_positions:
+                    err_msg = f'No options positions found for {data.ticker} ${data.strike} expr {data.expiration}'
+                else:
+                    quantity = sum([p.quantity for p in expiration_positions])
+                    if (data.action == OrderDirection.STC or data.action == OrderDirection.BTC) and quantity < data.quantity:
+                            err_msg = f'Not enough positions ({quantity}) to {data.action} {data.quantity} contracts.'
+        if err_msg:
+            log_error(err_msg, json.dumps(asdict(data), indent=4, default=serialize_datetime))
+        return
+
+
+    def get_webhook_data(self) -> WebHookData:
         """
         Validates the data received from the webhook.
         """
-        data = super().validate_data()
+        data = self.validate_data()   # always get data from webhook by calling this method!
         err_msgs = []
+        if 'key' in data:
+            del data['key']
         if 'ticker' not in data:
             err_msgs.append('Ticker not found in data.' )
         if 'price' in data:
@@ -60,7 +88,7 @@ class TastyTrade(Action):
         if 'action' not in data:
             err_msgs.append('Action not found in data.')
         else:
-            if data['action'] not in [member.value for member in Action]:
+            if data['action'] not in [member.value for member in OrderDirection]:
                 err_msgs.append('Invalid action.')
         if 'quantity' in data:
             try:
@@ -76,8 +104,11 @@ class TastyTrade(Action):
                 err_msgs.append('Invalid expiration format.')
         else:
             err_msgs.append('Expiration not found in data.')
-        # if 'DTE' not in data:
-        #     err_msgs.append('DTE not found in data.')
+        if 'DTE' in data:
+            try:
+                data['DTE'] = int(data['DTE'])
+            except ValueError:
+                err_msgs.append('DTE is not an integer.')
         if 'strike' in data:
             try:
                 data['strike'] = Decimal(data['strike'])
@@ -88,44 +119,6 @@ class TastyTrade(Action):
         if err_msgs:
             raise ValueError('\n'.join(err_msgs))
         return WebHookData(**data)
-
-    def run(self, *args, **kwargs):
-        super().run(*args, **kwargs)  # this is required
-        """
-        Custom run method. Add your custom logic here.
-        """
-        print(self.name, '---> action has run!')
-        try:
-            data = self.validate_data()  # always get data from webhook by calling this method!
-            # {'ticker': 'S1!', 'price': '5935', 'timestamp': '2024-11-19T20:28:17Z', 'action': 'STO', 'quantity': 1, 'expiration': '2025-08-15', 'DTE': 365, 'strike': 650.0, 'key': 'WebhookReceived:f5f3f4'}
-        except ValueError as e:
-            log_error(e.args[0], json.dumps(self.data, indent=4), logger)
-            return
-        
-        tt_session = TastytradeSession()
-        account: Account = tt_session.get_account()
-        balances: AccountBalance = account.get_balances(tt_session.session)
-        ps:PositionSummary = asyncio.run(tt_session.get_positions())
-
-        self.loging(data, account, balances)
-
-        # equity option positions
-        ticker_positions = [p for p in ps.positions if p.underlying_symbol == data.ticker and p.instrument_type == 'EQUITY_OPTION']
-        err_msg = None
-        if not ticker_positions:
-            err_msg = f'No options positions found for {data.ticker}'
-        else:
-            strike_positions = [p for p in ticker_positions if p.strike_price == data.strike]
-            if not strike_positions:
-                err_msg = f'No options positions found for {data.ticker} with strike {data.strike}'
-            else:
-                expiration_positions = [p for p in strike_positions if p.expiration == data.expiration]
-                if not expiration_positions:
-                    err_msg = f'No options positions found for {data.ticker} with strike {data.strike} and expiration {data.expiration}'
-        if err_msg:
-            log_error(err_msg, json.dumps(data, indent=4,))
-        return
- 
 
 
     def loging(self, data:WebHookData, account:Account, balances:AccountBalance):
@@ -140,7 +133,7 @@ class TastyTrade(Action):
 
         positions = account.get_positions(TastytradeSession.session, include_marks=True)
         logger.info('POSITIONS')
-        for pos in [p for p in positions if p.underlying_symbol == data['ticker']]:
+        for pos in [p for p in positions if p.underlying_symbol == data.ticker]:
             logger.info('===================================')
             logger.info(f'Symbol:     {pos.symbol}')
             logger.info(f'Type:       {pos.instrument_type}')

@@ -4,6 +4,7 @@ import asyncio
 from decimal import Decimal
 from datetime import date, datetime
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import List, Optional, cast
 
 from tastytrade import Account, Session, DXLinkStreamer, API_URL
@@ -26,6 +27,31 @@ from utils.log import get_logger, log_error
 
 logger = get_logger(__name__)
 ZERO = Decimal(0)
+
+
+def serialize_datetime(obj): 
+    if isinstance(obj, datetime) or isinstance(obj, date): 
+        return obj.isoformat() 
+    raise TypeError(f'Type {type(obj)} is not serializable') 
+
+
+class OrderDirection(Enum):
+    BTO = 'BTO'
+    STO = 'STO'
+    BTC = 'BTC'
+    STC = 'STC'
+
+
+@dataclass
+class WebHookData:
+    ticker: str
+    price: Decimal
+    timestamp: datetime
+    action: OrderDirection
+    quantity: int
+    expiration: date
+    DTE: int
+    strike: Decimal
 
 
 @dataclass

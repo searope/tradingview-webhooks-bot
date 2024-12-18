@@ -63,7 +63,7 @@ class Event:
         """
         self._actions.append(action)
 
-    def trigger(self, *args, **kwargs):
+    async def trigger(self, *args, **kwargs):
         if self.active:
             logger.info(f'EVENT TRIGGERED --->\t{str(self)}')
 
@@ -72,6 +72,6 @@ class Event:
 
             for action in self._actions:
                 action.set_data(data)
-                action.run()
+                await action.run()
         else:
             logger.info(f'EVENT NOT TRIGGERED (event is inactive) --->\t{str(self)}')
