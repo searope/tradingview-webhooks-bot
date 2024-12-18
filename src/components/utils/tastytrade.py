@@ -404,15 +404,13 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
         order_resp:PlacedOrderResponse = acc.place_order(tt_session, order, dry_run=False)
         if order_resp.errors is None or len(order_resp.errors) == 0:
             if order_resp.warnings is not None and len(order_resp.warnings) > 0:
-                logger.warning(f'Order placed with warnings:\n\t\
-                    {"\n\t".join([f"code: {o.code}\tmessage: {o.message}" for o in order_resp.warnings])}')
+                logger.warning(f'Order placed with warnings:\n\t{"\n\t".join([f"code: {o.code}\tmessage: {o.message}" for o in order_resp.warnings])}')
             logger.info(f'Order placed successfully. \
-                Buying power effect: {order_resp.buying_power_effect}, {order_resp.buying_power_effect / nl * Decimal(100):.2f}%\n\
+                Buying power effect: {order_resp.buying_power_effect}, {order_resp.buying_power_effect / nl * Decimal(100):.2f}%\n \
                 Fees: {order_resp.fee_calculation}')
         else:
             log_error(
-                f'Order placement failed. Errors:\n\t\
-                {"\n\t".join([f"code: {o.code}\tmessage: {o.message}" for o in order_resp.errors])}', error_header, logger)
+                f'Order placement failed. Errors:\n\t{"\n\t".join([f"code: {o.code}\tmessage: {o.message}" for o in order_resp.errors])}', error_header, logger)
 
 
     async def get_positions(self, account:Account = None) -> PositionsSummary:
