@@ -31,9 +31,9 @@ schema_list = {
 
 #@app.route("/", methods=["GET"])
 @app.get("/")
-async def dashboard():
+async def dashboard(request: Request):
     gui_key = os.getenv('GUI_KEY')
-    if gui_key is None or gui_key != request.args.get('gui_key'):
+    if gui_key is None or gui_key != request.query_params['gui_key']:
         logger.error('Invalid or missing GUI_KEY.')
         return 'Access Denied', 401
     
