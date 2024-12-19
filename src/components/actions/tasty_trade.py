@@ -58,6 +58,8 @@ class TastyTrade(Action):
                             err_msg = f'Not enough positions ({quantity}) to {data.action} {data.quantity} contracts.'
         if err_msg:
             log_error(err_msg, json.dumps(asdict(data), indent=4, default=serialize_datetime))
+        else:
+            log_error('No errors found.', json.dumps(expiration_positions, indent=4, default=serialize_datetime))
         return
 
 
