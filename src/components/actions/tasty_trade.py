@@ -29,7 +29,7 @@ class TastyTrade(Action):
             data = self.get_webhook_data()
             # {'ticker': 'S1!', 'price': '5935', 'timestamp': '2024-11-19T20:28:17Z', 'action': 'STO', 'quantity': 1, 'expiration': '2025-08-15', 'DTE': 365, 'strike': 650.0, 'key': 'WebhookReceived:f5f3f4'}
         except ValueError as e:
-            log_error(self._raw_data, e.args[0], logger)
+            log_error(str(self._raw_data), str(e.args[0]), logger)
             return
         
         tt_session = TastytradeSession()
@@ -86,10 +86,10 @@ class TastyTrade(Action):
         else:
             err_msgs.append('Timestamp not found in data.')
         if 'action' not in data:
-            err_msgs.append('Action not found in data.')
+            err_msgs.append('Trade action not found in data.')
         else:
             if data['action'] not in [member.value for member in OrderDirection]:
-                err_msgs.append('Invalid action.')
+                err_msgs.append('Invalid trade action.')
         if 'quantity' in data:
             try:
                 data['quantity'] = int(data['quantity'])
