@@ -29,7 +29,7 @@ class TastyTrade(Action):
             data = self.get_webhook_data()
             # {'ticker': 'S1!', 'price': '5935', 'timestamp': '2024-11-19T20:28:17Z', 'action': 'STO', 'quantity': 1, 'expiration': '2025-08-15', 'DTE': 365, 'strike': 650.0, 'key': 'WebhookReceived:f5f3f4'}
         except ValueError as e:
-            log_error(e.args[0], json.dumps(asdict(self.data), indent=4, default=serialize_datetime), logger)
+            log_error(self._raw_data, e.args[0], logger)
             return
         
         tt_session = TastytradeSession()
