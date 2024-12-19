@@ -49,9 +49,9 @@ class WebHookData:
     timestamp: datetime
     action: OrderDirection
     quantity: int
-    expiration: date
-    DTE: int
     strike: Decimal
+    expiration: date
+    DTE: Optional[int] = None
 
 
 @dataclass
