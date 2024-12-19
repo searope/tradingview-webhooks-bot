@@ -67,7 +67,6 @@ async def webhook(request: Request):
                 Request data: {await request.body()}
                 Request headers: {request.headers}'''
         log_error(err_msg)
-        log_error(f'Request headers: {request.headers}')
         return 'Error getting JSON data from request', 415
     if 'key' not in data:
         err_msg = \
