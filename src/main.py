@@ -7,7 +7,7 @@ from starlette.templating import Jinja2Templates
 from components.actions.base.action import am
 from components.events.base.event import em
 from components.schemas.trading import Order, Position
-from utils.log import get_logger
+from utils.log import get_logger, log_error
 from utils.register import register_action, register_event, register_link
 
 # register actions, events, links
@@ -33,7 +33,7 @@ schema_list = {
 async def dashboard(request: Request):
     gui_key = os.getenv('GUI_KEY')
     if gui_key is None or gui_key != request.query_params['gui_key']:
-        logger.error('Invalid or missing GUI_KEY.')
+        log_error('Invalid or missing GUI_KEY.')
         return 'Access Denied', 401
     
     '''
@@ -62,10 +62,19 @@ async def dashboard(request: Request):
 async def webhook(request: Request):
     data = await request.json()
     if data is None:
-        logger.error(f'Error getting JSON data from request...')
-        logger.error(f'Request data: {await request.body()}')
-        logger.error(f'Request headers: {request.headers}')
+        err_msg = \
+            f'''Error getting JSON data from request...
+                Request data: {await request.body()}
+                Request headers: {request.headers}'''
+        log_error(err_msg)
+        log_error(f'Request headers: {request.headers}')
         return 'Error getting JSON data from request', 415
+    if 'key' not in data:
+        err_msg = \
+            f'''Webhook request missing key...
+                Request data: {data}'''
+        log_error(err_msg)
+        return 'Webhook request missing key', 400
 
     logger.info(f'Request Data: {data}')
     triggered_events = []
@@ -76,7 +85,7 @@ async def webhook(request: Request):
                 triggered_events.append(event.name)
 
     if not triggered_events:
-        logger.warning(f'No events triggered for webhook request {request.json()}')
+        log_error(f'No events triggered for webhook request {request.json()}')
     else:
         logger.info(f'Triggered events: {triggered_events}')
 
