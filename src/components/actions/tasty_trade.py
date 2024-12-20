@@ -8,7 +8,7 @@ from tastytrade.account import AccountBalance
 from tastytrade.instruments import InstrumentType
 
 from components.actions.base.action import Action
-from components.utils.tastytrade import TastytradeSession, PositionsSummary, WebHookData, OrderDirection, serialize_datetime
+from components.utils.tastytrade import TastytradeSession, PositionsSummary, Position, WebHookData, OrderDirection, serializer
 from utils.log import get_logger, log_error
 
 logger = get_logger(__name__)
@@ -57,9 +57,9 @@ class TastyTrade(Action):
                     if (data.action == OrderDirection.STC or data.action == OrderDirection.BTC) and quantity < data.quantity:
                             err_msg = f'Not enough positions ({quantity}) to {data.action} {data.quantity} contracts.'
         if err_msg:
-            log_error(err_msg, json.dumps(asdict(data), indent=4, default=serialize_datetime))
-        else:
-            log_error('No errors found.', json.dumps(expiration_positions, indent=4, default=serialize_datetime))
+            log_error(err_msg + '\n' + json.dumps(asdict(data), indent=2, default=serializer), logger)
+        else:            
+            log_error(json.dumps(expiration_positions, indent=2, default=serializer), 'No errors found.', logger)
         return
 
 

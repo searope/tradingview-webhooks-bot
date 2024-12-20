@@ -17,15 +17,15 @@ def get_logger(name, level=logging.DEBUG) -> logging.Logger:
     return logger
 
 
-def log_error(message: str, header: str = None, logger: logging.Logger = None):
+def log_error(message: str, header: str = 'ERROR', logger: logging.Logger = None):
+    headers = {        
+        'Tags': 'rotating_light',
+        'Title': header
+    }
     if logger is None:
         logger = default_logger
-    if header is None:
-        error_msg = 'ERROR: ' + message
-    else:
-        error_msg = header + '\n' + message
-    logger.error(error_msg)
+    logger.error(header + ':\t' + message)
     if NTFY_TOPIC:
-        requests.post(f'https://ntfy.sh/{NTFY_TOPIC}', data=(error_msg).encode(encoding='utf-8'))
+        requests.post(f'https://ntfy.sh/{NTFY_TOPIC}', data=(message).encode(encoding='utf-8'), headers=headers)
         # TODO: add markdown formatting to the message https://docs.ntfy.sh/publish/#__tabbed_7_7
         

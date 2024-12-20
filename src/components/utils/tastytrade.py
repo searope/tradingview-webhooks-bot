@@ -29,9 +29,15 @@ logger = get_logger(__name__)
 ZERO = Decimal(0)
 
 
-def serialize_datetime(obj): 
-    if isinstance(obj, datetime) or isinstance(obj, date): 
+def serializer(obj): 
+    if isinstance(obj, (datetime, date)): 
         return obj.isoformat() 
+    elif isinstance(obj, Decimal):
+        return str(obj.quantize(Decimal('0.001')))
+    elif isinstance(obj, (CurrentPosition, Position)):
+        return obj.__dict__
+    elif isinstance(obj, float):
+        return round(obj, 2)
     raise TypeError(f'Type {type(obj)} is not serializable') 
 
 
@@ -55,6 +61,7 @@ class WebHookData:
 
 
 @dataclass
+#@dataclass_json
 class Position(CurrentPosition):
     streamer_symbol:str = None
     direction:int = None
@@ -623,7 +630,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                 ps.day_change = mark_price - (ps.close_price_prev or ZERO)  # type: ignore
                 ps.pnl_day = ps.day_change * pos.quantity * pos.multiplier
             else:
-                log_error(f'Skipping {pos.symbol}, unknown instrument type {pos.instrument_type}!', logger=logger)
+                log_error(f'Skipping {pos.symbol}, unknown instrument type {pos.instrument_type}!', 'Unknown instrument type', logger=logger)
                 continue
 
             if ps.created_at.date() == today:

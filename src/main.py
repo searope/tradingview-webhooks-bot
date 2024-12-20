@@ -33,7 +33,7 @@ schema_list = {
 async def dashboard(request: Request):
     gui_key = os.getenv('GUI_KEY')
     if gui_key is None or gui_key != request.query_params['gui_key']:
-        log_error('Invalid or missing GUI_KEY.')
+        log_error('Invalid or missing GUI_KEY.', 'Access Denied', logger)
         return 'Access Denied', 401
     
     '''
@@ -66,13 +66,13 @@ async def webhook(request: Request):
             f'''Error getting JSON data from request...
                 Request data: {await request.body()}
                 Request headers: {request.headers}'''
-        log_error(err_msg)
+        log_error(err_msg, 'No JSON data in request', logger)
         return 'Error getting JSON data from request', 415
     if 'key' not in data:
         err_msg = \
             f'''Webhook request missing key...
                 Request data: {data}'''
-        log_error(err_msg)
+        log_error(err_msg, 'Webhook request missing key', logger)
         return 'Webhook request missing key', 400
 
     logger.info(f'Request Data: {data}')
@@ -84,7 +84,7 @@ async def webhook(request: Request):
                 triggered_events.append(event.name)
 
     if not triggered_events:
-        log_error(f'No events triggered for webhook request {request.json()}')
+        log_error(f'No events triggered for webhook request {request.json()}', 'No Events Triggered', logger)
     else:
         logger.info(f'Triggered events: {triggered_events}')
 
