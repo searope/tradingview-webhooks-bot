@@ -79,45 +79,45 @@ class TastyTrade(Action):
             try:
                 data['price'] = Decimal(data['price'])
             except ValueError:
-                err_msgs.append(f'Price is not a number: {data['price']}.')
+                err_msgs.append(f'Price is not a number: {data["price"]}.')
         else:
             err_msgs.append('Price not found in data.')
         if 'timestamp' in data:
             try:
                 data['timestamp'] = datetime.fromisoformat(data['timestamp'])
             except ValueError:
-                err_msgs.append(f'Invalid timestamp format: {data['timestamp']}.')
+                err_msgs.append(f'Invalid timestamp format: {data["timestamp"]}.')
         else:
             err_msgs.append('Timestamp not found in data.')
         if 'action' not in data:
             err_msgs.append('Trade action not found in data.')
         else:
             if data['action'] not in [member.value for member in OrderDirection]:
-                err_msgs.append(f'Invalid trade action: {data['action']}.')
+                err_msgs.append(f'Invalid trade action: {data["action"]}.')
         if 'quantity' in data:
             try:
                 data['quantity'] = int(data['quantity'])
             except ValueError:
-                err_msgs.append(f'Quantity is not an integer: {data['quantity']}.')
+                err_msgs.append(f'Quantity is not an integer: {data["quantity"]}.')
         else:
             err_msgs.append('Quantity not found in data.')
         if 'expiration' in data:
             try:
                 data['expiration'] = date.fromisoformat(data['expiration'])
             except ValueError:
-                err_msgs.append(f'Invalid expiration format: {data['expiration']}.')
+                err_msgs.append(f'Invalid expiration format: {data["expiration"]}.')
         else:
             err_msgs.append('Expiration not found in data.')
         if 'DTE' in data:
             try:
                 data['DTE'] = int(data['DTE'])
             except ValueError:
-                err_msgs.append(f'DTE is not an integer: {data['DTE']}.')
+                err_msgs.append(f'DTE is not an integer: {data["DTE"]}.')
         if 'strike' in data:
             try:
                 data['strike'] = Decimal(data['strike'])
             except ValueError:
-                err_msgs.append(f'Strike is not a number: {data['strike']}.')
+                err_msgs.append(f'Strike is not a number: {data["strike"]}.')
         else:
             err_msgs.append('Strike not found in data.')
         if err_msgs:
