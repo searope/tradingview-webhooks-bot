@@ -7,7 +7,7 @@ from starlette.templating import Jinja2Templates
 from components.actions.base.action import am
 from components.events.base.event import em
 from components.schemas.trading import Order, Position
-from utils.log import get_logger, log_error
+from utils.log import get_logger, log_ntfy, LogType
 from utils.register import register_action, register_event, register_link
 
 # register actions, events, links
@@ -33,7 +33,7 @@ schema_list = {
 async def dashboard(request: Request):
     gui_key = os.getenv('GUI_KEY')
     if gui_key is None or gui_key != request.query_params['gui_key']:
-        log_error('Invalid or missing GUI_KEY.', 'Access Denied', logger)
+        log_ntfy(LogType.ERROR, 'Invalid or missing GUI_KEY.', 'Access Denied', logger=logger)
         return 'Access Denied', 401
     
     '''
@@ -66,13 +66,13 @@ async def webhook(request: Request):
             f'''Error getting JSON data from request...
                 Request data: {await request.body()}
                 Request headers: {request.headers}'''
-        log_error(err_msg, 'No JSON data in request', logger)
+        log_ntfy(LogType.ERROR, err_msg, 'No JSON data in request', logger=logger)
         return 'Error getting JSON data from request', 415
     if 'key' not in data:
         err_msg = \
             f'''Webhook request missing key...
                 Request data: {data}'''
-        log_error(err_msg, 'Webhook request missing key', logger)
+        log_ntfy(LogType.ERROR, err_msg, 'Webhook request missing key', logger=logger)
         return 'Webhook request missing key', 400
 
     logger.info(f'Request Data: {data}')
@@ -84,7 +84,7 @@ async def webhook(request: Request):
                 triggered_events.append(event.name)
 
     if not triggered_events:
-        log_error(f'No events triggered for webhook request {request.json()}', 'No Events Triggered', logger)
+        log_ntfy(LogType.ERROR, f'No events triggered for webhook request {request.json()}', 'No Events Triggered', logger=logger)
     else:
         logger.info(f'Triggered events: {triggered_events}')
 

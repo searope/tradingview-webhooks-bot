@@ -23,7 +23,7 @@ from tastytrade.metrics import MarketMetricInfo, a_get_market_metrics
 from tastytrade.order import (NewOrder, NewComplexOrder, OrderAction, OrderType, OrderTimeInForce, PriceEffect, PlacedOrderResponse, TradeableTastytradeJsonDataclass)
 from tastytrade.streamer import EventType
 from tastytrade.utils import today_in_new_york, now_in_new_york, TastytradeError
-from utils.log import get_logger, log_error
+from utils.log import get_logger, log_ntfy, LogType
 
 logger = get_logger(__name__)
 ZERO = Decimal(0)
@@ -201,14 +201,14 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
         # modified to use our error handling
         if response.status_code // 100 != 2:
             content = response.json()['error']
-            log_error(f"{content['message']}", logger=logger)
+            log_ntfy(LogType.ERROR, f"{content['message']}", logger=logger)
             errors = content.get('errors')
             if errors is not None:
                 for error in errors:
                     if "code" in error:
-                        log_error(f"{error['message']}", logger=logger)
+                        log_ntfy(LogType.ERROR, f"{error['message']}", logger=logger)
                     else:
-                        log_error(f"{error['reason']}", logger=logger)
+                        log_ntfy(LogType.ERROR, f"{error['reason']}", logger=logger)
             return None
         else:
             data = response.json()['data']
@@ -281,7 +281,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                     tick_size = chain.tick_sizes[0].value
 
         if len(error_msg) > 0:
-            log_error('\n'.join(error_msg), error_header, logger)
+            log_ntfy(LogType.ERROR, '\n'.join(error_msg), error_header, logger=logger)
             return
 
         # precision = tick_size.as_tuple().exponent
@@ -314,7 +314,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
             else:
                 spread_strikes = [s for s in sorted(subchain.strikes, key=lambda x: x.strike_price, reverse=True) if s.strike_price < option_at_strike.strike_price]
             if len(spread_strikes) < width:
-                log_error(f'No second leg strikes available for {option_type_str} spread with strike {option_at_strike.strike_price} and width {width}.', error_header, logger)
+                log_ntfy(LogType.ERROR, f'No second leg strikes available for {option_type_str} spread with strike {option_at_strike.strike_price} and width {width}.', error_header, logger=logger)
                 return
             spread_strike = spread_strikes[width - 1]
 
@@ -384,7 +384,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                 price_effect=PriceEffect.CREDIT if quantity < 0 else PriceEffect.DEBIT
             )
         else:
-            log_error(f'Invalid order type {order_type}. Accepted order types are {accepted_order_types}', error_header, logger)
+            log_ntfy(LogType.ERROR, f'Invalid order type {order_type}. Accepted order types are {accepted_order_types}', error_header, logger=logger)
             return
         
         acc = TastytradeSession.get_account()
@@ -405,7 +405,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
             err_msg = str(e) + f'\nOptions BP: ${acc_balances.derivative_buying_power}'
             if price is not None:
                 err_msg += f'\nPrice: {price}'
-            log_error(err_msg, error_header, logger)
+            log_ntfy(LogType.ERROR, err_msg, error_header, logger=logger)
             return
         
         order_resp:PlacedOrderResponse = acc.place_order(tt_session, order, dry_run=False)
@@ -418,8 +418,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                 Buying power effect: {order_resp.buying_power_effect}, {order_resp.buying_power_effect / nl * Decimal(100):.2f}%\n \
                 Fees: {order_resp.fee_calculation}')
         else:
-            log_error(
-                f'Order placement failed. Errors:{newline_tab}{newline_tab.join([f"code: {o.code}{tab}message: {o.message}" for o in order_resp.errors])}', error_header, logger)
+            log_ntfy(LogType.ERROR, f'Order placement failed. Errors:{newline_tab}{newline_tab.join([f"code: {o.code}{tab}message: {o.message}" for o in order_resp.errors])}', error_header, logger=logger)
 
 
     async def get_positions(self, account:Account = None) -> PositionsSummary:
@@ -630,7 +629,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                 ps.day_change = mark_price - (ps.close_price_prev or ZERO)  # type: ignore
                 ps.pnl_day = ps.day_change * pos.quantity * pos.multiplier
             else:
-                log_error(f'Skipping {pos.symbol}, unknown instrument type {pos.instrument_type}!', 'Unknown instrument type', logger=logger)
+                log_ntfy(LogType.ERROR, f'Skipping {pos.symbol}, unknown instrument type {pos.instrument_type}!', 'Unknown instrument type', logger=logger)
                 continue
 
             if ps.created_at.date() == today:

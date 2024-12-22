@@ -9,7 +9,7 @@ from tastytrade.instruments import InstrumentType
 
 from components.actions.base.action import Action
 from components.utils.tastytrade import TastytradeSession, PositionsSummary, Position, WebHookData, OrderDirection, serializer
-from utils.log import get_logger, log_error
+from utils.log import get_logger, log_ntfy, LogType
 
 logger = get_logger(__name__)
 
@@ -29,7 +29,7 @@ class TastyTrade(Action):
             data = self.get_webhook_data()
             # {'ticker': 'S1!', 'price': '5935', 'timestamp': '2024-11-19T20:28:17Z', 'action': 'STO', 'quantity': 1, 'expiration': '2025-08-15', 'DTE': 365, 'strike': 650.0, 'key': 'WebhookReceived:f5f3f4'}
         except ValueError as e:
-            log_error(str(self._raw_data), str(e.args[0]), logger)
+            log_ntfy(LogType.ERROR, str(self._raw_data), str(e.args[0]), logger=logger)
             return
         
         tt_session = TastytradeSession()
@@ -57,9 +57,11 @@ class TastyTrade(Action):
                     if (data.action == OrderDirection.STC or data.action == OrderDirection.BTC) and quantity < data.quantity:
                             err_msg = f'Not enough positions ({quantity}) to {data.action} {data.quantity} contracts.'
         if err_msg:
-            log_error(err_msg + '\n' + json.dumps(asdict(data), indent=2, default=serializer), logger)
+            log_ntfy(LogType.ERROR, err_msg + '\n' + json.dumps(asdict(data), indent=2, default=serializer), logger=logger)
+        elif len(expiration_positions) != 1:
+            log_ntfy(LogType.ERROR, json.dumps(expiration_positions, indent=2, default=serializer), 'More than one position found.', logger=logger)
         else:            
-            log_error(json.dumps(expiration_positions, indent=2, default=serializer), 'No errors found.', logger)
+            log_ntfy(LogType.SUCCESS, json.dumps(expiration_positions, indent=2, default=serializer), 'No errors found.', logger=logger)
         return
 
 
@@ -77,45 +79,45 @@ class TastyTrade(Action):
             try:
                 data['price'] = Decimal(data['price'])
             except ValueError:
-                err_msgs.append('Price is not a number.')
+                err_msgs.append(f'Price is not a number: {data['price']}.')
         else:
             err_msgs.append('Price not found in data.')
         if 'timestamp' in data:
             try:
                 data['timestamp'] = datetime.fromisoformat(data['timestamp'])
             except ValueError:
-                err_msgs.append('Invalid timestamp format.')
+                err_msgs.append(f'Invalid timestamp format: {data['timestamp']}.')
         else:
             err_msgs.append('Timestamp not found in data.')
         if 'action' not in data:
             err_msgs.append('Trade action not found in data.')
         else:
             if data['action'] not in [member.value for member in OrderDirection]:
-                err_msgs.append('Invalid trade action.')
+                err_msgs.append(f'Invalid trade action: {data['action']}.')
         if 'quantity' in data:
             try:
                 data['quantity'] = int(data['quantity'])
             except ValueError:
-                err_msgs.append('Quantity is not an integer.')
+                err_msgs.append(f'Quantity is not an integer: {data['quantity']}.')
         else:
             err_msgs.append('Quantity not found in data.')
         if 'expiration' in data:
             try:
                 data['expiration'] = date.fromisoformat(data['expiration'])
             except ValueError:
-                err_msgs.append('Invalid expiration format.')
+                err_msgs.append(f'Invalid expiration format: {data['expiration']}.')
         else:
             err_msgs.append('Expiration not found in data.')
         if 'DTE' in data:
             try:
                 data['DTE'] = int(data['DTE'])
             except ValueError:
-                err_msgs.append('DTE is not an integer.')
+                err_msgs.append(f'DTE is not an integer: {data['DTE']}.')
         if 'strike' in data:
             try:
                 data['strike'] = Decimal(data['strike'])
             except ValueError:
-                err_msgs.append('Strike is not a number.')
+                err_msgs.append(f'Strike is not a number: {data['strike']}.')
         else:
             err_msgs.append('Strike not found in data.')
         if err_msgs:
