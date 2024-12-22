@@ -25,9 +25,9 @@ class LogTag(str, Enum):
     CRITICAL = 'fire'
     FATAL = 'fire'
     ERROR = 'rotating_light'
-    WARNING = 'monocle_face'
-    WARN = 'monocle_face'
-    INFO = 'cucumber'
+    WARNING = 'warning'
+    WARN = 'warning'
+    INFO = 'information_source'
     DEBUG = 'lady_beetle'
     SUCCESS = 'white_check_mark'
 
@@ -42,7 +42,10 @@ def get_logger(name, level=logging.DEBUG) -> logging.Logger:
     return logger
 
 
-def log_ntfy(log_type:LogType, message: str, title: str = None, log_tags:list[LogTag] = [], logger: logging.Logger = None):
+def log_ntfy(log_type:LogType, message: str, title: str = None, log_tags:list[LogTag] = None, logger: logging.Logger = None):
+    if logger is None: logger = default_logger
+    if log_tags is None: log_tags = []
+    
     log_message = (title + ':\t') if title else '' + message
     if log_type == LogType.CRITICAL or log_type == LogType.FATAL:        
         logger.critical(log_message)
@@ -58,15 +61,16 @@ def log_ntfy(log_type:LogType, message: str, title: str = None, log_tags:list[Lo
         log_tags.insert(0, LogTag.INFO)        
     elif log_type == LogType.DEBUG:
         logger.debug(log_message)
-        log_tags.insert(0, LogTag.DEBUG)        
+        log_tags.insert(0, LogTag.DEBUG)
+    elif log_type == LogType.SUCCESS:
+        logger.info(log_message)
+        log_tags.insert(0, LogTag.SUCCESS)
+        title = 'SUCCESS' if title is None else title
 
     headers = {}
     headers['Title'] = title or logging.getLevelName(log_type)
     headers['Tags'] = ','.join([tag.value for tag in log_tags])
 
-    if logger is None:
-        logger = default_logger
-        
     if NTFY_TOPIC:
         requests.post(f'https://ntfy.sh/{NTFY_TOPIC}', data=(message).encode(encoding='utf-8'), headers=headers)
         # TODO: add markdown formatting to the message https://docs.ntfy.sh/publish/#__tabbed_7_7
