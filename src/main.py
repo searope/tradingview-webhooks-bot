@@ -60,14 +60,18 @@ async def dashboard(request: Request):
 
 @app.post("/webhook")
 async def webhook(request: Request):
-    data = await request.json()
-    if data is None:
+    try:
+        data = await request.json()
+        if not data: raise ValueError('No JSON data in request')
+    except Exception as e:
         err_msg = \
-            f'''Error getting JSON data from request...
+            f'''Error parsing JSON data from request...
+                Exception: {str(e)}
                 Request data: {await request.body()}
                 Request headers: {request.headers}'''
-        log_ntfy(LogType.ERROR, err_msg, 'No JSON data in request', logger=logger)
-        return 'Error getting JSON data from request', 415
+        log_ntfy(LogType.ERROR, err_msg, 'Error parsing JSON data', logger=logger)
+        return 'Error parsing JSON data from request', 400
+
     if 'key' not in data:
         err_msg = \
             f'''Webhook request missing key...

@@ -23,8 +23,7 @@ class TastyTrade(Action):
         """
         Custom run method. Add your custom logic here.
         """
-        print(self.name, '---> action has run!')
-        # data = self.validate_data()   # always get data from webhook by calling this method!
+        logger.info(self.name + ' ---> action has run!')
         try:
             data = self.get_webhook_data()
             # {'ticker': 'S1!', 'price': '5935', 'timestamp': '2024-11-19T20:28:17Z', 'action': 'STO', 'quantity': 1, 'expiration': '2025-08-15', 'DTE': 365, 'strike': 650.0, 'key': 'WebhookReceived:f5f3f4'}
@@ -37,7 +36,7 @@ class TastyTrade(Action):
         balances: AccountBalance = account.get_balances(tt_session.session)
         ps:PositionsSummary = await tt_session.get_positions()
 
-        self.loging(data, account, balances)
+        self.account_data_logging(data, account, balances)
 
         # equity option positions
         ticker_positions = [p for p in ps.positions if p.underlying_symbol == data.ticker and p.instrument_type == InstrumentType.EQUITY_OPTION]
@@ -125,7 +124,7 @@ class TastyTrade(Action):
         return WebHookData(**data)
 
 
-    def loging(self, data:WebHookData, account:Account, balances:AccountBalance):
+    def account_data_logging(self, data:WebHookData, account:Account, balances:AccountBalance):
         logger.info(f'Cash balance:     {balances.cash_balance}')
         logger.info(f'Net liquidity:    {balances.net_liquidating_value}')
         logger.info(f'Options BP:       {balances.equity_buying_power}')

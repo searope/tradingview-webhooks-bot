@@ -41,11 +41,30 @@ def serializer(obj):
     raise TypeError(f'Type {type(obj)} is not serializable') 
 
 
-class OrderDirection(Enum):
+class OrderDirection(str, Enum):
     BTO = 'BTO'
     STO = 'STO'
     BTC = 'BTC'
     STC = 'STC'
+    BUY = 'BUY'
+    SELL = 'SELL'
+
+    @staticmethod
+    def to_order_action(od:OrderDirection) -> OrderAction: # type: ignore
+        if od == OrderDirection.BTO:
+            return OrderAction.BUY_TO_OPEN
+        elif od == OrderDirection.STO:
+            return OrderAction.SELL_TO_OPEN
+        elif od == OrderDirection.BTC:
+            return OrderAction.BUY_TO_CLOSE
+        elif od == OrderDirection.STC:
+            return OrderAction.SELL_TO_CLOSE
+        elif od == OrderDirection.BUY:
+            return OrderAction.BUY
+        elif od == OrderDirection.SELL:
+            return OrderAction.SELL
+        else:
+            raise Exception(f'Invalid OrderDirection: {od}')        
 
 
 @dataclass
@@ -61,7 +80,6 @@ class WebHookData:
 
 
 @dataclass
-#@dataclass_json
 class Position(CurrentPosition):
     streamer_symbol:str = None
     direction:int = None
@@ -222,6 +240,34 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
             width: Optional[int] = None, order_type:OrderType = OrderType.MARKET,
             stop_price: Optional[Decimal] = None,
             gtc: bool = False, weeklies: bool = False):
+        """
+        Sends an option order to the Tastytrade platform.
+        Parameters:
+        option_type (OptionType): The type of the option (CALL or PUT).
+        symbol (str): The symbol of the underlying asset.
+        quantity (int): The number of contracts to trade.
+        strike (Optional[Decimal], optional): The strike price of the option. Defaults to None.
+        delta (Optional[int], optional): The delta of the option. Defaults to None.
+        expiration (Optional[date], optional): The expiration date of the option. Defaults to None.
+        dte (Optional[int], optional): Days to expiration. Defaults to None.
+        width (Optional[int], optional): The width of the spread. Defaults to None.
+        order_type (OrderType, optional): The type of the order (MARKET, LIMIT, STOP). Defaults to OrderType.MARKET.
+        stop_price (Optional[Decimal], optional): The stop price for stop orders. Defaults to None.
+        gtc (bool, optional): Good till canceled flag. Defaults to False.
+        weeklies (bool, optional): Weeklies flag. Defaults to False.
+        Returns:
+        None
+        Raises:
+        TastytradeError: If there is an error placing the order.
+        Logs:
+        Logs errors and warnings related to order placement.
+        """
+        '''Send an BTO or STO option order to Tastyworks. 
+        The order will be placed as a single leg order without width or a spread order when width is provided.
+        The order will be placed as a market order if order_type is not specified. 
+        If order_type is specified as OrderType.STOP, stop_price must be provided.
+        If expiration is not provided, dte must be provided. If both expiration and dte are provided, expiration will be used.
+        '''
 
         is_future = symbol[0] == '/'
         option_type_str = 'call' if option_type == OptionType.CALL else 'put'
@@ -257,7 +303,7 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
         else:
             if is_future:  # futures options
                 chain = NestedFutureOptionChain.get_chain(tt_session, symbol)
-                if dte is None:
+                if expiration is not None:
                     subchain = None
                     option_chain = chain.option_chains[0]
                     exps = [e for e in option_chain.expirations if e.expiration_date == expiration]
@@ -265,7 +311,9 @@ class TastytradeSession(metaclass=TastytradeSessionMeta):
                         subchain = exps[0]
                     else:
                         error_msg.append(f'Expiration not found.')
-                else:
+                else: 
+                    # check at the beging of the func ensures either expiration or dte are present
+                    # find the closest expiration to the DTE
                     subchain = min(chain.option_chains[0].expirations, key=lambda exp: abs(exp.days_to_expiration - dte))
                     tick_size = subchain.tick_sizes[0].value
             else:
