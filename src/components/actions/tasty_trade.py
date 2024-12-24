@@ -27,7 +27,7 @@ class TastyTrade(Action):
         try:
             data = self.get_webhook_data()
             # {'ticker': 'S1!', 'price': '5935', 'timestamp': '2024-11-19T20:28:17Z', 'action': 'STO', 'quantity': 1, 'expiration': '2025-08-15', 'DTE': 365, 'strike': 650.0, 'key': 'WebhookReceived:f5f3f4'}
-        except ValueError as e:
+        except Exception as e:
             log_ntfy(LogType.ERROR, str(self._raw_data), str(e.args[0]), logger=logger)
             return
         
