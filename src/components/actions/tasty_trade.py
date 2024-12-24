@@ -121,7 +121,8 @@ class TastyTrade(Action):
             err_msgs.append('Strike not found in data.')
         if err_msgs:
             raise ValueError('\n'.join(err_msgs))
-        return WebHookData(**data)
+        exclude_extra_data = {k: v for k, v in data.items() if k in WebHookData.__dataclass_fields__}
+        return WebHookData(**exclude_extra_data)
 
 
     def account_data_logging(self, data:WebHookData, account:Account, balances:AccountBalance):
