@@ -49,22 +49,24 @@ class OrderDirection(str, Enum):
     BUY = 'BUY'
     SELL = 'SELL'
 
-    @staticmethod
-    def to_order_action(od:OrderDirection) -> OrderAction: # type: ignore
-        if od == OrderDirection.BTO:
+    def to_order_action(self) -> OrderAction:
+        if self == OrderDirection.BTO:
             return OrderAction.BUY_TO_OPEN
-        elif od == OrderDirection.STO:
+        elif self == OrderDirection.STO:
             return OrderAction.SELL_TO_OPEN
-        elif od == OrderDirection.BTC:
+        elif self == OrderDirection.BTC:
             return OrderAction.BUY_TO_CLOSE
-        elif od == OrderDirection.STC:
+        elif self == OrderDirection.STC:
             return OrderAction.SELL_TO_CLOSE
-        elif od == OrderDirection.BUY:
+        elif self == OrderDirection.BUY:
             return OrderAction.BUY
-        elif od == OrderDirection.SELL:
+        elif self == OrderDirection.SELL:
             return OrderAction.SELL
         else:
-            raise Exception(f'Invalid OrderDirection: {od}')        
+            raise Exception(f'''
+            Invalid OrderDirection: {self}
+            Supported order directions are {OrderDirection.BTO}, {OrderDirection.STO}, {OrderDirection.BTC}, {OrderDirection.STC}, {OrderDirection.BUY}, {OrderDirection.SELL}
+            ''')
 
 
 @dataclass
