@@ -1,6 +1,6 @@
 fastapi[standard]==0.115.6
 requests==2.32.3
 simplejson==3.19.3
-tastytrade==9.1
+tastytrade==9.6
 typer==0.15.1
 uvicorn==0.34.0

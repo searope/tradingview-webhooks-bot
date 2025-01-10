@@ -103,7 +103,7 @@ async def get_positions(self, account:Account = None) -> List[CurrentPosition]:
             metrics = metrics_dict[o.underlying_symbol]
             o = options_dict[pos.symbol]
             closing[i + 1] = o
-            ps.day_change = mark_price - (summary_dict[o.streamer_symbol].prevDayClosePrice or ZERO)  # type: ignore
+            ps.day_change = mark_price - (summary_dict[o.streamer_symbol].prev_day_close_price or ZERO)  # type: ignore
             ps.pnl_day = ps.day_change * pos.quantity * pos.multiplier
             ps.pnl_total = direction * (mark_price - pos.average_open_price * pos.multiplier)
             ps.trade_price = pos.average_open_price * pos.multiplier
@@ -132,7 +132,7 @@ async def get_positions(self, account:Account = None) -> List[CurrentPosition]:
             # indicators = TastytradeSession.get_indicators(today, metrics)
             # pnl = direction * (mark_price - pos.average_open_price * pos.multiplier)
             # trade_price = pos.average_open_price * pos.multiplier
-            # day_change = mark_price - (summary_dict[o.streamer_symbol].prevDayClosePrice or ZERO)  # type: ignore
+            # day_change = mark_price - (summary_dict[o.streamer_symbol].prev_day_close_price or ZERO)  # type: ignore
             # pnl_day = day_change * pos.quantity * pos.multiplier
         elif pos.instrument_type == InstrumentType.FUTURE_OPTION:
             o = future_options_dict[pos.symbol]
@@ -144,12 +144,12 @@ async def get_positions(self, account:Account = None) -> List[CurrentPosition]:
             f = futures_dict[o.underlying_symbol]
             metrics = metrics_dict[o.root_symbol]
             indicators = TastytradeSession.get_indicators(today, metrics)
-            bwd = ((summary_dict[f.streamer_symbol].prevDayClosePrice or ZERO) *  # type: ignore
+            bwd = ((summary_dict[f.streamer_symbol].prev_day_close_price or ZERO) *  # type: ignore
                 metrics.beta * delta / spy_price) if metrics.beta else 0
             ivr = (metrics.tos_implied_volatility_index_rank or 0) * 100
             trade_price = pos.average_open_price / f.display_factor
             pnl = (mark_price - trade_price) * direction
-            day_change = mark_price - (summary_dict[o.streamer_symbol].prevDayClosePrice or ZERO)  # type: ignore
+            day_change = mark_price - (summary_dict[o.streamer_symbol].prev_day_close_price or ZERO)  # type: ignore
             pnl_day = day_change * pos.quantity * pos.multiplier
         elif pos.instrument_type == InstrumentType.EQUITY:
             theta = 0
@@ -165,7 +165,7 @@ async def get_positions(self, account:Account = None) -> List[CurrentPosition]:
             ivr = (metrics.tos_implied_volatility_index_rank or 0) * 100
             pnl = mark - pos.average_open_price * pos.quantity * direction
             trade_price = pos.average_open_price
-            day_change = mark_price - (summary_dict[pos.symbol].prevDayClosePrice or ZERO)  # type: ignore
+            day_change = mark_price - (summary_dict[pos.symbol].prev_day_close_price or ZERO)  # type: ignore
             pnl_day = day_change * pos.quantity
         elif pos.instrument_type == InstrumentType.FUTURE:
             theta = 0
@@ -180,7 +180,7 @@ async def get_positions(self, account:Account = None) -> List[CurrentPosition]:
             ivr = (metrics.tw_implied_volatility_index_rank or 0) * 100
             trade_price = pos.average_open_price * f.notional_multiplier
             pnl = (mark_price - trade_price) * pos.quantity * direction
-            day_change = mark_price - (summary_dict[f.streamer_symbol].prevDayClosePrice or ZERO)  # type: ignore
+            day_change = mark_price - (summary_dict[f.streamer_symbol].prev_day_close_price or ZERO)  # type: ignore
             pnl_day = day_change * pos.quantity * pos.multiplier
             net_liq = pnl_day
         elif pos.instrument_type == InstrumentType.CRYPTOCURRENCY:
@@ -195,7 +195,7 @@ async def get_positions(self, account:Account = None) -> List[CurrentPosition]:
             pos.quantity = round(pos.quantity, 2)
             c = crypto_dict[pos.symbol]
             closing[i + 1] = c
-            day_change = mark_price - (summary_dict[c.streamer_symbol].prevDayClosePrice or ZERO)  # type: ignore
+            day_change = mark_price - (summary_dict[c.streamer_symbol].prev_day_close_price or ZERO)  # type: ignore
             pnl_day = day_change * pos.quantity * pos.multiplier
         else:
             print(f'Skipping {pos.symbol}, unknown instrument type '
