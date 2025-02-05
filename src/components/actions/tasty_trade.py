@@ -18,6 +18,7 @@ class TastyTrade(Action):
     def __init__(self):
         super().__init__()
     
+    
     async def run(self, *args, **kwargs):
         super().run(*args, **kwargs)  # this is required
         """

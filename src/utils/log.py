@@ -42,7 +42,7 @@ def get_logger(name, level=logging.DEBUG) -> logging.Logger:
     return logger
 
 
-def log_ntfy(log_type:LogType, message: str, title: str = None, log_tags:list[LogTag] = None, logger: logging.Logger = None):
+def log_ntfy(log_type:LogType, message: str, title: str = None, log_tags:list[LogTag] = None, ntfy:bool = True, logger: logging.Logger = None):
     if logger is None: logger = default_logger
     if log_tags is None: log_tags = []
     
@@ -71,7 +71,7 @@ def log_ntfy(log_type:LogType, message: str, title: str = None, log_tags:list[Lo
     headers['Title'] = title or logging.getLevelName(log_type)
     headers['Tags'] = ','.join([tag.value for tag in log_tags])
 
-    if NTFY_TOPIC:
+    if ntfy and NTFY_TOPIC:
         requests.post(f'https://ntfy.sh/{NTFY_TOPIC}', data=(message).encode(encoding='utf-8'), headers=headers)
         # TODO: add markdown formatting to the message https://docs.ntfy.sh/publish/#__tabbed_7_7
         

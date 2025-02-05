@@ -32,7 +32,7 @@ schema_list = {
 @app.get("/")
 async def dashboard(request: Request):
     gui_key = os.getenv('GUI_KEY')
-    if gui_key is None or gui_key != request.query_params['gui_key']:
+    if gui_key is None or 'gui_key' not in request.query_params or gui_key != request.query_params['gui_key']:
         log_ntfy(LogType.ERROR, 'Invalid or missing GUI_KEY.', 'Access Denied', logger=logger)
         return 'Access Denied', 401
     
@@ -61,8 +61,9 @@ async def dashboard(request: Request):
 @app.post("/webhook")
 async def webhook(request: Request):
     try:
+        if 'content-type' not in request.headers or request.headers['content-type'] != 'application/json':
+            return 'Invalid Content-Type header', 400
         data = await request.json()
-        if not data: raise ValueError('No JSON data in request')
     except Exception as e:
         err_msg = \
             f'''Error parsing JSON data from request...
