@@ -62,7 +62,8 @@ async def dashboard(request: Request):
 async def webhook(request: Request):
     try:
         if 'content-type' not in request.headers or request.headers['content-type'] != 'application/json':
-            return 'Invalid Content-Type header', 400
+            log_ntfy(LogType.ERROR, f'Headers: {request.headers}', 'Invalid or missing Content-Type header', ntfy=False, logger=logger)
+            return 'Invalid or missing Content-Type header', 400
         data = await request.json()
     except Exception as e:
         err_msg = \
