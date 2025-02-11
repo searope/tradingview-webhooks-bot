@@ -78,6 +78,7 @@ class ExpirationType(str, Enum):
     MONTHLY = 'Regular'
     QUARTERLY = 'Quarterly'
 
+
 @dataclass
 class WebHookData:
     ticker: str

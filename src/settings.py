@@ -1,10 +1,12 @@
 # actions
-#REGISTERED_ACTIONS = ['PrintData', 'AsyncDemo']
 REGISTERED_ACTIONS = ['TastyTrade']
+#REGISTERED_ACTIONS = ['Schwab']
+#REGISTERED_ACTIONS = ['TastyTrade', 'Schwab']
 
 # events
 REGISTERED_EVENTS = ['WebhookReceived']
 
 # links
-#REGISTERED_LINKS = [('PrintData', 'WebhookReceived'), ('AsyncDemo', 'WebhookReceived')]
 REGISTERED_LINKS = [('TastyTrade', 'WebhookReceived')]
+#REGISTERED_LINKS = [('Schwab', 'WebhookReceived')]
+#REGISTERED_LINKS = [('TastyTrade', 'WebhookReceived'), ('Schwab', 'WebhookReceived')]
